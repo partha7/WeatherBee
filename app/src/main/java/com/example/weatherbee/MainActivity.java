@@ -38,6 +38,8 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
     ProgressBar pb_loading_indicator;
     String location = "94043,USA";
     WeatherBeeAdapter weatherBeeAdapter;
+    private static final int FORECAST_LOADER_ID = 0;
+
 
 
 
@@ -56,7 +58,14 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
         rv_weather.setLayoutManager(linearLayoutManager);
         rv_weather.setHasFixedSize(true);
         rv_weather.setAdapter(weatherBeeAdapter);
-        getWeatherData(location);
+//        getWeatherData(location);
+        int loaderId = FORECAST_LOADER_ID;
+
+        LoaderManager.LoaderCallbacks<String[]> callback = MainActivity.this;
+
+        Bundle bundleForLoader = null;
+
+        getSupportLoaderManager().initLoader(loaderId, bundleForLoader, callback);
 
     }
     public void showWeatherData(){
@@ -68,10 +77,10 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
         rv_weather.setVisibility(View.INVISIBLE);
         tv_error_message.setVisibility(View.VISIBLE);
     }
-
-    public void getWeatherData(String location) {
-     new DownloadWeatherData().execute(location);
-    }
+//
+//    public void getWeatherData(String location) {
+//     new DownloadWeatherData().execute(location);
+//    }
 
     @Override
     public void onClick(String weatherForTheDay) {
@@ -87,71 +96,106 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
     @Override
     public Loader<String[]> onCreateLoader(int id, @Nullable Bundle args) {
         return new AsyncTaskLoader<String[]>(this) {
+            String[] mWeatherData = null;
+
+
+            @Override
+            protected void onStartLoading() {
+                if (mWeatherData != null) {
+                    deliverResult(mWeatherData);
+                } else {
+                    pb_loading_indicator.setVisibility(View.VISIBLE);
+                    forceLoad();
+                }
+            }
 
 
             @Nullable
             @Override
             public String[] loadInBackground() {
-                return new String[0];
+
+                URL url = NetworkUtils.buildUrl(location);
+                String response = null;
+                try {
+                    response = NetworkUtils.getAPIResponse(url);
+//                System.out.println("Response "+ response);
+                    String[] simpleWeatherStringsFromJson = GetResponseToDisplay.getWeatherDetailsToDisplay(MainActivity.this, response);
+                    return simpleWeatherStringsFromJson;
+
+                } catch (IOException | JSONException e) {
+                    e.printStackTrace();
+                }
+                return null;
             }
         };
-
     }
 
-    @Override
-    public void onLoadFinished(@NonNull Loader<String[]> loader, String[] data) {
 
-    }
+            @Override
+            public void onLoadFinished(@NonNull Loader<String[]> loader, String[] data) {
+                pb_loading_indicator.setVisibility(View.INVISIBLE);
+                weatherBeeAdapter.setWeatherData(data);
+                if (null == data) {
+                    showErrorMessage();
+                } else {
+                    showWeatherData();
+                }
 
-    @Override
-    public void onLoaderReset(@NonNull Loader<String[]> loader) {
-
-    }
-
-    public class DownloadWeatherData extends AsyncTask<String, Void, String[]> {
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-            pb_loading_indicator.setVisibility(View.VISIBLE);
-        }
-
-
-        @Override
-        protected String[] doInBackground(String... strings) {
-            URL url = NetworkUtils.buildUrl(strings[0]);
-            String response = null;
-            try {
-                response = NetworkUtils.getAPIResponse(url);
-//                System.out.println("Response "+ response);
-                String[] simpleWeatherStringsFromJson = GetResponseToDisplay.getWeatherDetailsToDisplay(MainActivity.this, response);
-                return simpleWeatherStringsFromJson;
-
-            } catch (IOException | JSONException e) {
-                e.printStackTrace();
             }
-            return null;
-        }
 
-        @Override
-        protected void onPostExecute(String weatherdata[]) {
-            pb_loading_indicator.setVisibility(View.INVISIBLE);
-            if (weatherdata != null) {
+            @Override
+            public void onLoaderReset(@NonNull Loader<String[]> loader) {
 
-                showWeatherData();
+            }
+    private void invalidateData() {
+        weatherBeeAdapter.setWeatherData(null);
+    }
 
-                weatherBeeAdapter.setWeatherData(weatherdata);
 
-//                for (String weatherString : s) {
-//                    tv_weather.append((weatherString) + "\n\n\n");\
-
+//    public class DownloadWeatherData extends AsyncTask<String, Void, String[]> {
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//            pb_loading_indicator.setVisibility(View.VISIBLE);
+//        }
+//
+//
+//        @Override
+//        protected String[] doInBackground(String... strings) {
+//            URL url = NetworkUtils.buildUrl(strings[0]);
+//            String response = null;
+//            try {
+//                response = NetworkUtils.getAPIResponse(url);
+////                System.out.println("Response "+ response);
+//                String[] simpleWeatherStringsFromJson = GetResponseToDisplay.getWeatherDetailsToDisplay(MainActivity.this, response);
+//                return simpleWeatherStringsFromJson;
+//
+//            } catch (IOException | JSONException e) {
+//                e.printStackTrace();
 //            }
-            }
-            else{
-                showErrorMessage();
-            }
-
-        }
-    }
+//            return null;
+//        }
+//
+//        @Override
+//        protected void onPostExecute(String weatherdata[]) {
+//            pb_loading_indicator.setVisibility(View.INVISIBLE);
+//            if (weatherdata != null) {
+//
+//                showWeatherData();
+//
+//                weatherBeeAdapter.setWeatherData(weatherdata);
+//
+////                for (String weatherString : s) {
+////                    tv_weather.append((weatherString) + "\n\n\n");\
+//
+////            }
+//            }
+//            else{
+//                showErrorMessage();
+//            }
+//
+//        }
+//    }
 
     private void openLocationInMap() {
         String addressString = "1600 Ampitheatre Parkway, CA";
@@ -184,8 +228,8 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
 
         if(id == R.id.action_refresh){
 //            tv_weather.setText("");
-            weatherBeeAdapter.setWeatherData(null);
-            getWeatherData(location);
+            invalidateData();
+            getSupportLoaderManager().restartLoader(FORECAST_LOADER_ID, null, this);
             return true;
         }
         else if(id == R.id.action_map){
