@@ -244,19 +244,19 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
 //    }
 
     private void openLocationInMap() {
-        String addressString = "1600 Ampitheatre Parkway, CA";
-        Uri geoLocation = Uri.parse("geo:0,0?q=" + addressString);
+            String addressString = getPreferredWeatherLocation(this);
+            Uri geoLocation = Uri.parse("geo:0,0?q=" + addressString);
 
-        Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.setData(geoLocation);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setData(geoLocation);
 
-        if (intent.resolveActivity(getPackageManager()) != null) {
-            startActivity(intent);
-        } else {
-            System.out.println( "Couldn't call " + geoLocation.toString()
-                    + ", no receiving apps installed!");
+            if (intent.resolveActivity(getPackageManager()) != null) {
+                startActivity(intent);
+            } else {
+                System.out.println("Couldn't call " + geoLocation.toString() + ", no receiving apps installed!");
+            }
         }
-    }
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
