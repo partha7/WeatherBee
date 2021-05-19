@@ -1,18 +1,9 @@
 package com.example.weatherbee;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.loader.app.LoaderManager;
-import androidx.loader.content.AsyncTaskLoader;
-import androidx.loader.content.Loader;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -21,7 +12,16 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.AsyncTaskLoader;
+import androidx.loader.content.Loader;
+import androidx.preference.PreferenceManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.weatherbee.utils.GetResponseToDisplay;
 import com.example.weatherbee.utils.NetworkUtils;
@@ -31,17 +31,33 @@ import org.json.JSONException;
 import java.io.IOException;
 import java.net.URL;
 
-public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter.WeatherBeeOnClickListener, LoaderManager.LoaderCallbacks<String[]> {
+public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter.WeatherBeeOnClickListener, LoaderManager.LoaderCallbacks<String[]>, SharedPreferences.OnSharedPreferenceChangeListener {
 
     TextView tv_error_message;
     RecyclerView rv_weather;
     ProgressBar pb_loading_indicator;
-    String location = "94043,USA";
+    String location;
     WeatherBeeAdapter weatherBeeAdapter;
     private static final int FORECAST_LOADER_ID = 0;
+    private static boolean PREFERENCES_HAVE_BEEN_UPDATED = false;
 
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (PREFERENCES_HAVE_BEEN_UPDATED) {
+            System.out.println("onStart: preferences were updated");
+            getSupportLoaderManager().restartLoader(FORECAST_LOADER_ID, null, this);
+            PREFERENCES_HAVE_BEEN_UPDATED = false;
+        }
+    }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        PreferenceManager.getDefaultSharedPreferences(this)
+                .unregisterOnSharedPreferenceChangeListener(this);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +76,9 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
         rv_weather.setAdapter(weatherBeeAdapter);
 //        getWeatherData(location);
         int loaderId = FORECAST_LOADER_ID;
+
+        PreferenceManager.getDefaultSharedPreferences(this)
+                .registerOnSharedPreferenceChangeListener(this);
 
         LoaderManager.LoaderCallbacks<String[]> callback = MainActivity.this;
 
@@ -92,6 +111,32 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
         startActivity(intentToStartDetailsActivity);
     }
 
+    public static String getPreferredWeatherLocation(Context context) {
+        // COMPLETED (1) Return the user's preferred location
+        SharedPreferences prefs = PreferenceManager
+                .getDefaultSharedPreferences(context);
+        String keyForLocation = context.getString(R.string.pref_location_key);
+        String defaultLocation = context.getString(R.string.pref_location_default);
+        return prefs.getString(keyForLocation, defaultLocation);
+    }
+
+    public static boolean isMetric(Context context) {
+        // COMPLETED (2) Return true if the user's preference for units is metric, false otherwise
+        SharedPreferences prefs = PreferenceManager
+                .getDefaultSharedPreferences(context);
+        String keyForUnits = context.getString(R.string.pref_units_key);
+        String defaultUnits = context.getString(R.string.pref_units_metric);
+        String preferredUnits = prefs.getString(keyForUnits, defaultUnits);
+        String metric = context.getString(R.string.pref_units_metric);
+        boolean userPrefersMetric;
+        if (metric.equals(preferredUnits)) {
+            userPrefersMetric = true;
+        } else {
+            userPrefersMetric = false;
+        }
+        return userPrefersMetric;
+    }
+
     @NonNull
     @Override
     public Loader<String[]> onCreateLoader(int id, @Nullable Bundle args) {
@@ -113,6 +158,7 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
             @Nullable
             @Override
             public String[] loadInBackground() {
+                location = getPreferredWeatherLocation(getApplicationContext());
 
                 URL url = NetworkUtils.buildUrl(location);
                 String response = null;
@@ -242,6 +288,12 @@ public class MainActivity extends AppCompatActivity implements WeatherBeeAdapter
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        PREFERENCES_HAVE_BEEN_UPDATED = true;
     }
 }
 
